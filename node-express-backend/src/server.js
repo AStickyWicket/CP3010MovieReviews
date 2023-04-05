@@ -1,11 +1,14 @@
 import express from 'express';
 import path from 'path';
 import fs from 'fs';
-import {MongoClient } from 'mongodb';
-import { fileURLToPath } from 'url';
+import {MongoClient} from 'mongodb';
+import {fileURLToPath} from 'url';
 import multer from 'multer';
 import * as dotenv from 'dotenv' // see https://github.com/motdotla/dotenv#how-do-i-use-dotenv-with-import
 import bodyParser from 'body-parser'
+import mongoose from 'mongoose';
+import Customer from "./Customer.js";
+
 dotenv.config()
 
 const jsonParser = bodyParser.json()
@@ -17,16 +20,16 @@ console.log(__dirname);
 const app = express()
 const port = 8000
 //here is a change
-app.use(express.urlencoded({ extended: false }));
+app.use(express.urlencoded({extended: false}));
 app.use(express.static(path.join(__dirname, '../build')));
 
 app.use(express.static(path.join(__dirname, '../posters')));
 //app.use(express.static("posters"));
 
-const upload = multer({ dest: 'posters/' })
+const upload = multer({dest: 'posters/'})
 
 app.get(/^(?!\/api).+/, (req, res) => {
-  res.sendFile(path.join(__dirname, '../build/index.html'))
+    res.sendFile(path.join(__dirname, '../build/index.html'))
 });
 
 /*const movieData = JSON.parse(fs.readFileSync('./movies.json'));
@@ -39,10 +42,10 @@ console.log(movieData);
 ];*/
 
 app.get('/api/movies', async (req, res) => {
-    
+
     //res.json(movieData)
     const client = new MongoClient(process.env.MONGO_CONNECT);
-    
+
     await client.connect();
 
     const db = client.db('movies');
@@ -54,49 +57,52 @@ app.get('/api/movies', async (req, res) => {
 })
 
 app.post('/api/removeMovie', async (req, res) => {
-   console.log(req.body.title);
-   
-   const client = new MongoClient(process.env.MONGO_CONNECT);
-   await client.connect();
+    console.log(req.body.title);
 
-   const db = client.db('movies');
-   const result = await db.collection('reviews').deleteOne({ title: req.body.title})
-  
-   res.sendStatus(200);
+    const client = new MongoClient(process.env.MONGO_CONNECT);
+    await client.connect();
+
+    const db = client.db('movies');
+    const result = await db.collection('reviews').deleteOne({title: req.body.title})
+
+    res.sendStatus(200);
 })
 
 app.post('/api/overwrite', jsonParser, async (req, res) => {
-  const client = new MongoClient(process.env.MONGO_CONNECT);
-  await client.connect();
+    const client = new MongoClient(process.env.MONGO_CONNECT);
+    await client.connect();
 
-  const db = client.db('movies');
+    const db = client.db('movies');
 
-  //console.log(req.body);
-  /*for( let index in req.body ) {
-    console.log(req.body[index].title + " " + req.body[index].poster);
-  }*/
+    //console.log(req.body);
+    /*for( let index in req.body ) {
+      console.log(req.body[index].title + " " + req.body[index].poster);
+    }*/
 
-  const deleteResult = await db.collection('reviews').deleteMany({});
-  console.log('Deleted documents =>', deleteResult);
+    const deleteResult = await db.collection('reviews').deleteMany({});
+    console.log('Deleted documents =>', deleteResult);
 
-  const insertResult = await db.collection('reviews').insertMany(req.body);
-  console.log('Inserted documents =>', insertResult);
+    const insertResult = await db.collection('reviews').insertMany(req.body);
+    console.log('Inserted documents =>', insertResult);
 
-  res.sendStatus(200);
+    res.sendStatus(200);
 
 
 })
 
-app.post('/api/review', upload.single('movie_poster'),  async (req,res) => {
-  const client = new MongoClient(process.env.MONGO_CONNECT);
-  await client.connect();
+app.post('/api/review', upload.single('movie_poster'), async (req, res) => {
+    const client = new MongoClient(process.env.MONGO_CONNECT);
+    await client.connect();
 
-  const db = client.db('movies');
+    const db = client.db('movies');
 
 
-  const insertOperation = await db.collection('reviews').insertOne( {'title':req.body.title, 'poster':req.file.filename});
-  console.log(insertOperation);
-  res.redirect('/');
+    const insertOperation = await db.collection('reviews').insertOne({
+        'title': req.body.title,
+        'poster': req.file.filename
+    });
+    console.log(insertOperation);
+    res.redirect('/');
 
     /*movieData.push( { "title":req.body.title })
     saveData();
@@ -107,17 +113,33 @@ app.post('/api/review', upload.single('movie_poster'),  async (req,res) => {
 
 
 const saveData = () => {
-  const jsonContent = JSON.stringify(movieData);
-  fs.writeFile("./movies.json", jsonContent, 'utf8', function (err) {
-    if (err) {
-        console.log("An error occured while writing JSON Object to File.");
-    }
-    console.log("JSON file has been saved.");
-  });
+    const jsonContent = JSON.stringify(movieData);
+    fs.writeFile("./movies.json", jsonContent, 'utf8', function (err) {
+        if (err) {
+            console.log("An error occured while writing JSON Object to File.");
+        }
+        console.log("JSON file has been saved.");
+    });
 }
 
+app.post('/api/addInfo', async (req, res) => {
+    const {name, movie, email} = req.body;
+    await mongoose.connect(process.env.MONGO_CONNECT + process.env.MOVIE_COLLECTION);
+
+    try {
+        const custInfo = await Customer.create({
+            name: name,
+            movie: movie,
+            email: email
+        })
+        res.send(custInfo);
+    } catch (err) {
+        console.log(err);
+        res.sendStatus(206);
+    }
+})
 
 
 app.listen(port, () => {
-  console.log(`Example app listening on port ${port}`)
+    console.log(`Example app listening on port ${port}`)
 })
